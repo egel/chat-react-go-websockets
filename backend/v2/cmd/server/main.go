@@ -1,24 +1,32 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
-	"chatserver/pkg/websocket"
+	"chatserver/internal/pkg/home"
+	"chatserver/internal/pkg/ws"
 
 	"github.com/gorilla/mux"
 )
 
+const SERVER_PORT = 8000
+
 func main() {
 
 	// create websocket hub
-	hub := websocket.NewHub()
+	hub := ws.NewHub()
 	go hub.Run()
 
 	r := mux.NewRouter().StrictSlash(true)
+	r.HandleFunc("/", home.HomeHandler)
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		websocket.WebSocketHandler(hub, w, r)
+		ws.WebsocketHandler(hub, w, r)
 	})
 
-	log.Fatal(http.ListenAndServe(":8000", r))
+	log.Printf("Listening on port: %d", SERVER_PORT)
+
+	var addr = fmt.Sprintf(":%d", SERVER_PORT)
+	log.Fatal(http.ListenAndServe(addr, r))
 }

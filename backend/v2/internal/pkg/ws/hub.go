@@ -1,4 +1,4 @@
-package websocket
+package ws
 
 type Hub struct {
 	// Registered clients

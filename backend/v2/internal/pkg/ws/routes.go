@@ -1,4 +1,4 @@
-package websocket
+package ws
 
 import (
 	"log"
@@ -12,8 +12,8 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-// Handles websocket requests from the peer
-func WebSocketHandler(hub *Hub, w http.ResponseWriter, r *http.Request) {
+// WebsocketHandler handles websocket requests from the peer
+func WebsocketHandler(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
