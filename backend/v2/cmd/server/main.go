@@ -1,32 +1,53 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"context"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"chatserver/internal/pkg/home"
-	"chatserver/internal/pkg/ws"
+	"chatserver/internal/app"
+	"chatserver/pkg/logging"
 
-	"github.com/gorilla/mux"
+	"github.com/rs/zerolog/log"
 )
 
-const SERVER_PORT = 8000
-
 func main() {
+	// add logging
+	log.Logger = log.Output(logging.ConfigConsoleOutput())
 
-	// create websocket hub
-	hub := ws.NewHub()
-	go hub.Run()
+	appOptions := app.NewAppOptions(5)
+	app := app.Initialize(`localhost:8000`, appOptions)
 
-	r := mux.NewRouter().StrictSlash(true)
-	r.HandleFunc("/", home.HomeHandler)
-	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		ws.WebsocketHandler(hub, w, r)
-	})
+	go func() {
+		if err := app.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("ListenAndServe ERROR")
+		}
+	}()
 
-	log.Printf("Listening on port: %d", SERVER_PORT)
+	// Wait for interrupt signal to gracefully shutdown the server with
+	// a timeout of X.
+	quit := make(chan os.Signal)
+	// kill (no param) default send syscanll.SIGTERM
+	// kill -2 is syscall.SIGINT
+	// kill -9 is syscall. SIGKILL but can"t be catch, so don't need add it
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Info().Msg("Shutdown Server ...")
 
-	var addr = fmt.Sprintf(":%d", SERVER_PORT)
-	log.Fatal(http.ListenAndServe(addr, r))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := app.Server.Shutdown(ctx); err != nil {
+		log.Fatal().Err(err).Msg("Server Shutdown")
+	}
+	// catching ctx.Done(). timeout of X seconds.
+	select {
+	case <-ctx.Done():
+		log.Info().
+			Dur("GracefulShutdownTime", app.Options.GracefulShutdownTime).
+			Msg("timeout of before closing server")
+	}
+	log.Info().Msg("Server exiting")
 }

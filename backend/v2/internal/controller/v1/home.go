@@ -1,4 +1,4 @@
-package home
+package v1
 
 import (
 	"fmt"

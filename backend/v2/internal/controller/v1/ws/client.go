@@ -1,7 +1,6 @@
 package ws
 
 import (
-	"bytes"
 	"log"
 	"time"
 
@@ -46,7 +45,6 @@ type Client struct {
 // reads from this goroutine
 func (c *Client) ReadPump() {
 	defer func() {
-		c.hub.unregister <- c
 		c.wsconn.Close()
 	}()
 
@@ -58,15 +56,17 @@ func (c *Client) ReadPump() {
 	})
 
 	for {
-		_, message, err := c.wsconn.ReadMessage()
+		var payload Payload
+		err := c.wsconn.ReadJSON(&payload)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error: %v", err)
 			}
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		c.hub.broadcast <- message
+		if payload.topic == "chat" || payload.topic == "" {
+			c.hub.broadcast <- []byte(payload.body)
+		}
 	}
 }
 
@@ -84,6 +84,7 @@ func (c *Client) WritePump() {
 			c.wsconn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel
+				log.Println("hub closing channel")
 				c.wsconn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
