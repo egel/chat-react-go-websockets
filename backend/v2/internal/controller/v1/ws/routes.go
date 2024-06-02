@@ -1,11 +1,11 @@
 package ws
 
 import (
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog/log"
 )
 
 var upgrader = websocket.Upgrader{
@@ -25,17 +25,21 @@ func WebsocketHandler(hub *Hub, w http.ResponseWriter, r *http.Request) {
 				return true
 			}
 		}
-		log.Printf("origin not accepted: %s", r.Header["Origin"])
+		log.Info().
+			Any("Origin", r.Header["Origin"]).
+			Msg("Origin not accepted")
 		return false
 	}
 
 	// upgrade this connection to a WebSocket
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("WS Connection upgrade failed")
 		return
 	}
-	log.Printf("client connected (from %s)\n", r.Header["Origin"][0])
+	log.Info().
+		Str("Origin", r.Header["Origin"][0]).
+		Msg("client connected")
 
 	websocketClient := &Client{
 		hub:    hub,

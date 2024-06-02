@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,10 +17,17 @@ import (
 
 func main() {
 	// add logging
-	log.Logger = log.Output(logging.ConfigConsoleOutput())
+	output := logging.ConfigConsoleOutput()
+	log.Logger = log.Output(output).With().Caller().Logger()
 
-	appOptions := app.NewAppOptions(5)
-	app := app.Initialize(`localhost:8000`, appOptions)
+	const (
+		SERVER_HOST = "localhost"
+		SERVER_PORT = 8000
+	)
+
+	appOptions := app.NewAppOptions(0) // 0 = No GracefulShutdownTime
+	serverAddress := fmt.Sprintf("%s:%d", SERVER_HOST, SERVER_PORT)
+	app := app.Initialize(serverAddress, appOptions)
 
 	go func() {
 		if err := app.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

@@ -1,10 +1,11 @@
 package ws
 
 import (
-	"log"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -45,6 +46,7 @@ type Client struct {
 // reads from this goroutine
 func (c *Client) ReadPump() {
 	defer func() {
+		c.hub.unregister <- c
 		c.wsconn.Close()
 	}()
 
@@ -60,7 +62,7 @@ func (c *Client) ReadPump() {
 		err := c.wsconn.ReadJSON(&payload)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+				log.Error().Err(err)
 			}
 			break
 		}
@@ -84,7 +86,7 @@ func (c *Client) WritePump() {
 			c.wsconn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel
-				log.Println("hub closing channel")
+				log.Info().Msg("hub closing channel")
 				c.wsconn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
@@ -112,4 +114,19 @@ func (c *Client) WritePump() {
 			}
 		}
 	}
+}
+
+func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Error().Err(err)
+		return
+	}
+	client := &Client{hub: hub, wsconn: conn, send: make(chan []byte, 256)}
+	client.hub.register <- client
+
+	// Allow collection of memory referenced by the caller by doing all work in
+	// new goroutines.
+	go client.WritePump()
+	go client.ReadPump()
 }

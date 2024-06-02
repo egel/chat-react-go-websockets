@@ -1,5 +1,7 @@
 package ws
 
+import "github.com/rs/zerolog/log"
+
 type Hub struct {
 	// Registered clients
 	clients map[*Client]bool
@@ -39,6 +41,7 @@ func (h *Hub) Run() {
 				select {
 				case client.send <- message:
 				default:
+					log.Info().Any("client", client).Msg("Close")
 					close(client.send)
 					delete(h.clients, client)
 				}
