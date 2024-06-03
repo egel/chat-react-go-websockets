@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"chatserver/internal/app"
 	"chatserver/pkg/logging"
@@ -25,7 +24,7 @@ func main() {
 		SERVER_PORT = 8000
 	)
 
-	appOptions := app.NewAppOptions(0) // 0 = No GracefulShutdownTime
+	appOptions := app.NewAppOptions(1) // 0 = No GracefulShutdownTime
 	serverAddress := fmt.Sprintf("%s:%d", SERVER_HOST, SERVER_PORT)
 	app := app.Initialize(serverAddress, appOptions)
 
@@ -45,7 +44,7 @@ func main() {
 	<-quit
 	log.Info().Msg("Shutdown Server ...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), appOptions.GracefulShutdownTime)
 	defer cancel()
 	if err := app.Server.Shutdown(ctx); err != nil {
 		log.Fatal().Err(err).Msg("Server Shutdown")

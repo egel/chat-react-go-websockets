@@ -1,6 +1,8 @@
 package ws
 
-import "github.com/rs/zerolog/log"
+import (
+	"github.com/rs/zerolog/log"
+)
 
 type Hub struct {
 	// Registered clients
@@ -30,22 +32,36 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
+			log.Debug().Any("client", client).Msg("register")
 			h.clients[client] = true
+			h.send([]byte("A new client connected"), client)
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
+				log.Debug().Any("client", client).Msg("delete client")
 				delete(h.clients, client)
 				close(client.send)
+				h.send([]byte("client disconnected"), client)
 			}
 		case message := <-h.broadcast:
+			// send to all clients
 			for client := range h.clients {
 				select {
 				case client.send <- message:
 				default:
-					log.Info().Any("client", client).Msg("Close")
+					log.Info().Any("client", client).Str("message", string(message)).Msg("Sent message")
 					close(client.send)
 					delete(h.clients, client)
 				}
 			}
+		}
+	}
+}
+
+// send mesage to clients
+func (h *Hub) send(msg []byte, ignore *Client) {
+	for conn := range h.clients {
+		if conn != ignore {
+			h.broadcast <- msg
 		}
 	}
 }

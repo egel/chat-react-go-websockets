@@ -1,7 +1,6 @@
 package ws
 
 type Payload struct {
-	topic string
-	body  string
-	meta  string
+	Topic   string `json:"topic"`
+	Message string `json:"message"`
 }
