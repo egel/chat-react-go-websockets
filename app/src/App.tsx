@@ -1,22 +1,64 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import websocketLogo from './assets/websocket.svg'
-import golangLogo from './assets/golang.svg'
+import { useState, useRef, useEffect } from "react";
+import reactLogo from "./assets/react.svg";
+import websocketLogo from "./assets/websocket.svg";
+import golangLogo from "./assets/golang.svg";
 
-import './App.css'
+import useWebSocket, { ReadyState } from "react-use-websocket";
+
+import "./App.css";
+
+const WebSocketURL = "ws://localhost:8000/ws";
+
+// following https://stackoverflow.com/questions/62768520/reconnecting-web-socket-using-react-hooks
 
 function App() {
-  const [messages, setMessages] = useState<string[]>([])
+  const [chatMessages, setChatMessages] = useState<MessageEvent<any>[]>([]);
+  const [fieldMessage, setFieldMessage] = useState("");
+  const [fieldUser, setFieldUser] = useState("");
 
-  const ws = new WebSocket("ws://localhost:8000/ws")
+  const { sendMessage, lastMessage, readyState } = useWebSocket(WebSocketURL, {
+    share: false,
+    shouldReconnect: () => true,
+  });
 
-  ws.onopen = (event) => ws.send(JSON.stringify('hello from frontned!'))
+  const connectionStatus = {
+    [ReadyState.CONNECTING]: "Connecting",
+    [ReadyState.OPEN]: "Open",
+    [ReadyState.CLOSING]: "Closing",
+    [ReadyState.CLOSED]: "Closed",
+    [ReadyState.UNINSTANTIATED]: "Uninstantiated",
+  }[readyState];
 
-  ws.onmessage = (event) => {
-    const message = JSON.parse(event)
+  // run when the connection state changes
+  useEffect(() => {
+    console.log("connection state changed", connectionStatus);
 
-    // TODO: continue saving messages from server
-  }
+    if (readyState === ReadyState.OPEN) {
+      sendMessage("Some message");
+    }
+  });
+
+  // ws message received
+  useEffect(() => {
+    console.log(`got message: ${lastMessage}`);
+    if (lastMessage !== null) {
+      setChatMessages((prev) => prev.concat(lastMessage));
+    }
+  }, [lastMessage]);
+
+  const sendChatMessage = () => {
+    const str = JSON.stringify(`${fieldUser}: ${fieldMessage}`);
+  };
+
+  const handleUsernameChange = (event) => {
+    const val = event.target.value;
+    setFieldUser(val);
+  };
+
+  const handleFieldMessageChange = (event) => {
+    const val = event.target.value;
+    setFieldMessage(val);
+  };
 
   return (
     <div className="App">
@@ -28,7 +70,11 @@ function App() {
           <img src={reactLogo} className="logo react" alt="React logo" />
         </a>
         <a href="https://www.rfc-editor.org/rfc/rfc6455" target="_blank">
-          <img src={websocketLogo} className="logo websocket" alt="WebSocket logo" />
+          <img
+            src={websocketLogo}
+            className="logo websocket"
+            alt="WebSocket logo"
+          />
         </a>
         <a href="https://vitejs.dev" target="_blank">
           <img src="/vite.svg" className="logo" alt="Vite logo" />
@@ -41,34 +87,46 @@ function App() {
         beteween them.
       </p>
 
-      {
-        messages.length ? (
-          messages.map((message, index) => {
-            return (
-              <div className="message" key={index}>
-                {message}
-              </div>
-            )
-          })
-        ) : <div className="message__empty">Chat is empty.</div>
-      }
+      <h2>connection state: {connectionStatus}</h2>
+
+      {chatMessages.length ? (
+        chatMessages.map((message, index) => {
+          return (
+            <div className="message" key={index}>
+              {message.data}
+            </div>
+          );
+        })
+      ) : (
+        <div className="message__empty">Chat is empty.</div>
+      )}
 
       <form>
-        <input id="username" type="text" placeholder="Your name" />
-        <textarea id="usermessage" placeholder="Here type your message"></textarea>
+        <input
+          id="username"
+          type="text"
+          placeholder="Your name"
+          onChange={handleUsernameChange}
+        />
+        <textarea
+          id="usermessage"
+          placeholder="Here type your message"
+          onChange={handleFieldMessageChange}
+        ></textarea>
       </form>
 
       <div className="card">
-        <button onClick={() => console.log('sent')}>
+        <button
+          onClick={sendChatMessage}
+          disabled={readyState !== ReadyState.OPEN}
+        >
           Send message
         </button>
       </div>
 
-      <p className="read-the-docs">
-        Click on desired logos to learn more.
-      </p>
+      <p className="read-the-docs">Click on desired logos to learn more.</p>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
